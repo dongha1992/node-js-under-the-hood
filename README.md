@@ -3,9 +3,9 @@
 미루고 미루던 노드 공부. 자바스크립트에 대한 이해를 확실히 하기 위해선 노드JS도 잘 알아야 한다는 생각에 학습을 하게 되었다. 
 
 ## 목차
-  - [V8 엔진](#V8-엔진)
-  - [모듈 시스템](#모듈-시스템)
-  - [파일 시스템](#파일-시스템)
+  - [V8 엔진](#1.-V8-엔진)
+  - [모듈 시스템](#2.-모듈-시스템)
+  - [이벤트](#3.-이벤트)
 
 ## 1. V8 엔진
 
@@ -283,7 +283,7 @@ Node.js는 모든 모듈 파일을 내부적으로 Module Wrapper Function이란
 
 <img width="1000" alt="스크린샷 2025-05-20 오후 12 20 18" src="https://github.com/user-attachments/assets/a1d343ca-c359-43b9-85d1-aaab718bcbd9" /><br />
 
-[2.2.2 ](#2.2.2)에서 언급했던 ```exports, require, module, __filename, __dirname``` 키워드들이 주입된다.
+[2.2](#2.2)에서 언급했던 ```exports, require, module, __filename, __dirname``` 키워드들이 주입된다.
 
 <img width="1000" alt="스크린샷 2025-05-20 오후 12 34 45" src="https://github.com/user-attachments/assets/aa0b11d6-eaa2-48ca-9e5a-ee042f7997fd" /><br />
 
@@ -291,9 +291,145 @@ Node.js는 모든 모듈 파일을 내부적으로 Module Wrapper Function이란
 
 정리하자면, ```require```에 넘긴 ```'./greet'```를 **전체 파일 경로로 변환**하고 Node.js 내부에서 **모듈 객체와 exports 객채를 생성**한다. 그리고 해당 파일을 읽어와 **exports, require 등이 단긴 래퍼 함수로 감싸서 V8로 실행**하는 것이다. 
  
-## 3. 파일 시스템
+## 3. 이벤트
 
+이벤트란 무엇인가? 내게 이벤트는 브라우저 이벤트뿐이었지만, Node.js는 다르다. 
 
+Node.js에는 두 종류의 이벤트가 있다. 시스템 이벤트와 커스텀 이벤트다. 시스템 이벤트는 OS에서 발생하는 이벤트고, 커스텀 이벤트는 js에서 사용자에 의해 트리거되는 이벤트다. 
 
+그럼 두 이벤트를 알아보자. 
+
+### 3.1 Event Emitter
+
+```EventEmitter```는 여러 모듈에 이벤트를 발행하고, 여러 리스너가 구독하는 형태의 객체다. 
+
+```js
+const events = {
+  greet: [fn1, fn2],
+  something: [fn3]
+};
+```
+
+쉽게 말해 키, 배열 쌍으로 가지고 있다가, emit이 되면 배열을 순회하면서 함수을 실행하는 것이다. 
+
+아래는 ```EventEmitter``` 구현한 간단한 예시다.
+
+```js
+// emitter.js
+
+function Emitter() {
+  this.events = {};
+}
+
+// 리스너 등록함
+Emitter.prototype.on = function(type, listener) {
+  this.events[type] = this.events[type] || [];
+  this.events[type].push(listener);
+};
+
+// 이벤트 발생시킴
+Emitter.prototype.emit = function(type) {
+  if (this.events[type]) {
+    this.events[type].forEach(function(listener) {
+      listener();
+    });
+  }
+};
+
+module.exports = Emitter;
+
+// app.js
+const Emitter = require('./emitter');
+const emitter = new Emitter();
+
+emitter.on('greet', function() {
+  console.log('hello');
+});
+
+emitter.on('greet', function() {
+  console.log('good bye');
+});
+
+emitter.emit('greet'); // 리스너에 등록한 이벤트 이름을 넘김
+// hello
+// good bye
+```
+
+여기서 눈치챘겠지만, ```EventEmitter```는 ```prototype```을 사용하고 있다.
+
+실무에서 거의 보지 못 했던, 자바스크립트 서적 마지막 장에 위치해서 손이 가지 않은 ```prototype```이다.
+
+ ```EventEmitter```를 비롯한 많은 Node.js 코어 모듈들은 내부적으로 ```prototype```을 바탕으로 설계되었다. 추후 사용하게 될 fs, http 등등의 기능들도 ```prototype```으로  ```EventEmitter```을 상속하여 사용한다. 
+
+그때는 js에 클래스가 없어서 프로토타입으로 설계했겠지만(js의 class도 내부적으로는 프로토타입을 사용하지만), 프로토타입 덕분에 쉽게 상속 구조를 변경할 수 있어(런타임에 프로토타입 체인을 탐색하기 때문에) 가볍고 확장성이 높은 js만의 장점을 잘 살린 것 같다. (이 부분은 좀 더 공부해봐야할듯)
+
+Node.js 소스로 돌아가서 ```/util.js```에 가보자
+
+<img width="1000" alt="스크린샷 2025-05-20 오후 4 19 29" src="https://github.com/user-attachments/assets/2ac3aa6c-3005-4ae3-a78f-c99205d1ce73" /><br />
+
+```inherits```라는 내장함수가 있다. 이름부터 뭔가 상속과 관련되어 보인다. ```inherits```는 두 개의 인자를 받는다 ```ctor```은 타겟(자식) 생성자고, ```superCtor```은 상속받을 부모 생성자다. 
+
+<img width="947" alt="스크린샷 2025-05-20 오후 4 42 46" src="https://github.com/user-attachments/assets/fcbda07e-8daa-4b2c-91c1-adafefb9ec9e" /><br />
+
+```ctor```의 인스턴스의 프로토타입 체인에  ```superCtor```의 ```prototype```을 연결한다. 
+
+만약 ```new Child```을 하게 되면 아래와 같이 체인을 타면서 부모의 기능을 사용하게 된다. 
+
+```
+new Child() → Child.prototype → Parent.prototype → Object.prototype
+```
+
+그렇다면 한 번 ```inherits```을 사용하여 ```EventEmitter```를 상속받아보자.
+
+<img width="750" alt="스크린샷 2025-05-20 오후 4 50 12" src="https://github.com/user-attachments/assets/5d51cd0e-fec2-45de-bf39-ef0a3d7726fb" /><br />
+
+커스텀 이벤트인 ```Greetr```에 ```EventEmitter```를 상속받고, 
+
+<img width="750" alt="스크린샷 2025-05-20 오후 7 06 44" src="https://github.com/user-attachments/assets/34f8d31c-d259-4a44-87d1-305ca8201e64" /><br />
+
+추가적으로 새로운 메서드인 ```greet```을 정의했다. 프로토타입으로 ```EventEmitter```을 연결했기 때문에 ```emit```을 사용할 수 있다.
+
+<img width="750" alt="스크린샷 2025-05-20 오후 7 13 14" src="https://github.com/user-attachments/assets/742ff95c-0f5d-414e-ac0a-f7839aef4e90" /><br />
+
+이제 인스턴스를 하나 만들고 ```on```으로 이벤트를 등록하고 ```greet```을 실행해보면
+
+<img width="750" alt="스크린샷 2025-05-20 오후 7 14 15" src="https://github.com/user-attachments/assets/859133ff-46af-41a8-952f-6105a1b3b761" /><br />
+
+```on```에 등록한 로그가 잘 나온다. ```greeter.greet()```는 자신의 prototype에서 찾고, ```greeter.emit()```, ```greeter.on()```은 프로토타입 체인을 따라 ```EventEmitter.prototype```에서 찾는 것이다. 
+
+### 3.2 call
+
+프론트엔드를 하다보면 프로토타입도 그렇고, this도 그렇고, call, apply 이론만 배웠지 써본 적 없었는데, 여기 다 있었구나. Node.js 최고다.
+
+```call```, ```apply```가 Event Emitter 상속에 있어 큰 관여를 하고 있다. 그것이 무엇인지 알아보자.
+
+<img width="750" alt="스크린샷 2025-05-20 오후 7 49 04" src="https://github.com/user-attachments/assets/dccb36e2-75fd-48f3-91c5-33548d78db90" /><br />
+
+아까 예제를 다시 보자. 여기서 한 가지 빠진 게 있다. 
+
+위 예제는 Child 인스턴스에서는 Parent의 prototype에 정의된 속성만 접근할 수 있다. 
+
+즉, Parent에서 생성자 함수 안에서 ```this```에 직접 붙이는 속성은 프로토타입 상속이 되지 않는다. 
+
+가령, 
+
+```js
+function EventEmitter() {
+  this._events = Object.create(null);
+  // ... 
+}
+```
+
+이렇게 ```EventEmitter```에서 this로 정의된 속성은 사용하지 못 하는 것이다. 이걸 해결하기 위해 ```cal```을 사용한다. (다른 언어에서 super()와도 비슷하다)
+
+<img width="750" alt="스크린샷 2025-05-20 오후 7 54 15" src="https://github.com/user-attachments/assets/f76db5eb-1991-4226-aefe-3ed56dec8286" /><br />
+
+```call```로 부모의 this를 바인딩해줘야 한다. 이제 위 ```EventEmitter```를 Class로 변경해보면 
+
+<img width="750" alt="스크린샷 2025-05-20 오후 8 23 44" src="https://github.com/user-attachments/assets/5b3e5185-c908-4e2f-8c48-f199ee238f5e" /><br />
+
+ES6 이후 Class가 나왔지만 여전히 js가 프로토타입 기반인 것은 바뀌지 않았기 때문에 프로토타입을 이해하는 것은 중요하다. 
+
+## 4. 동기와 비동기
 
 
