@@ -3,11 +3,12 @@
 미루고 미루던 노드 공부. 자바스크립트에 대한 이해를 확실히 하기 위해선 노드JS도 잘 알아야 한다는 생각에 학습을 하게 되었다. 
 
 ## 목차
-  - [V8 엔진](#1.-V8-엔진)
-  - [모듈 시스템](#2.-모듈-시스템)
-  - [이벤트](#3.-이벤트)
+  - [V8 엔진](#1-V8-엔진)
+  - [모듈 시스템](#2-모듈-시스템)
+  - [이벤트](#3-이벤트)
+  - [작성중](#4-작성중)
 
-## 1. V8 엔진
+## 1.V8 엔진
 
 맨날 말로만 듣던 V8엔진이 도대체 무엇인지 차근차근 알아보자.
 
@@ -78,7 +79,7 @@ C++로 작성된 파일에 V8을 임배딩하고
 
 ```Node.js```란 V8엔진이 좀 더 기계어에 가까운 C++를 등에 업고 서버/OS 프로그래밍 등을 javascript에서도 가능하게 만든 굉장한 녀석이다!!
 
-## 2. 모듈 시스템
+## 2.모듈 시스템
 
 V8 엔진 덕분에 Node.js가 탄생할 수 있었던 배경도 알았으니 본격적으로 ```Node.js```에 대해 알아가보자. 
 
@@ -259,7 +260,7 @@ Node.js는 모든 모듈 파일을 내부적으로 Module Wrapper Function이란
 
 <img width="1000" alt="스크린샷 2025-05-20 오전 11 55 07" src="https://github.com/user-attachments/assets/7e9b403c-c35f-4e48-98f1-23d9e900cda7" /><br />
 
-여기서, 흥미로운 점은 가져온 모듈을 캐싱한다는 것이다! ```require```로 한번 모듈을 불러오면 그 뒤로 캐싱된 모듈을 사용한다. 이는 [2.2.1](#2.2.1)의 모듈 참조 공유의 원인이기도 하다. 
+여기서, 흥미로운 점은 가져온 모듈을 캐싱한다는 것이다! ```require```로 한번 모듈을 불러오면 그 뒤로 캐싱된 모듈을 사용한다. 이는 [2.3](#2-3)의 모듈 참조 공유의 원인이기도 하다. 
 
 <img width="1000" alt="스크린샷 2025-05-20 오후 12 00 11" src="https://github.com/user-attachments/assets/3162240b-da59-43f5-a055-0f37e16991ed" /><br />
 
@@ -283,7 +284,7 @@ Node.js는 모든 모듈 파일을 내부적으로 Module Wrapper Function이란
 
 <img width="1000" alt="스크린샷 2025-05-20 오후 12 20 18" src="https://github.com/user-attachments/assets/a1d343ca-c359-43b9-85d1-aaab718bcbd9" /><br />
 
-[2.2](#2.2)에서 언급했던 ```exports, require, module, __filename, __dirname``` 키워드들이 주입된다.
+[2.2](#2-2)에서 언급했던 ```exports, require, module, __filename, __dirname``` 키워드들이 주입된다.
 
 <img width="1000" alt="스크린샷 2025-05-20 오후 12 34 45" src="https://github.com/user-attachments/assets/aa0b11d6-eaa2-48ca-9e5a-ee042f7997fd" /><br />
 
@@ -291,7 +292,7 @@ Node.js는 모든 모듈 파일을 내부적으로 Module Wrapper Function이란
 
 정리하자면, ```require```에 넘긴 ```'./greet'```를 **전체 파일 경로로 변환**하고 Node.js 내부에서 **모듈 객체와 exports 객채를 생성**한다. 그리고 해당 파일을 읽어와 **exports, require 등이 단긴 래퍼 함수로 감싸서 V8로 실행**하는 것이다. 
  
-## 3. 이벤트
+## 3.이벤트
 
 이벤트란 무엇인가? 내게 이벤트는 브라우저 이벤트뿐이었지만, Node.js는 다르다. 
 
@@ -355,6 +356,8 @@ emitter.emit('greet'); // 리스너에 등록한 이벤트 이름을 넘김
 // good bye
 ```
 
+#### 3.1.1 Prototype
+
 여기서 눈치챘겠지만, ```EventEmitter```는 ```prototype```을 사용하고 있다.
 
 실무에서 거의 보지 못 했던, 자바스크립트 서적 마지막 장에 위치해서 손이 가지 않은 ```prototype```이다.
@@ -397,7 +400,7 @@ new Child() → Child.prototype → Parent.prototype → Object.prototype
 
 ```on```에 등록한 로그가 잘 나온다. ```greeter.greet()```는 자신의 prototype에서 찾고, ```greeter.emit()```, ```greeter.on()```은 프로토타입 체인을 따라 ```EventEmitter.prototype```에서 찾는 것이다. 
 
-### 3.2 call
+#### 3.1.2 call
 
 프론트엔드를 하다보면 프로토타입도 그렇고, this도 그렇고, call, apply 이론만 배웠지 써본 적 없었는데, 여기 다 있었구나. Node.js 최고다.
 
@@ -430,6 +433,113 @@ function EventEmitter() {
 
 ES6 이후 Class가 나왔지만 여전히 js가 프로토타입 기반인 것은 바뀌지 않았기 때문에 프로토타입을 이해하는 것은 중요하다. 
 
-## 4. 동기와 비동기
+### 3.2 System Event
+
+자, 이제 Node.js의 두 번째 이벤트, System Event를 알아보자. 
+
+#### 3.2.1 libuv
+
+System Event에서 가장 중요한 것은 ```libuv```다.
+
+<img width="1000" alt="스크린샷 2025-05-20 오후 8 55 33" src="https://github.com/user-attachments/assets/62b6921b-38cd-47d7-8e86-75150c3cf238" /><br />
+
+libuv는 Node.js에 내장된 C 라이브러리로 Node.js에서 비동기를 담당한다.
+
+위 그림에서 libuv는 OS에 요청을 보내고, 이벤트가 완료되면 Queue에 등록한다. 이때, libuv는 이벤트 루프를 통해 완료된 이벤트가 있는지 확인한다.
+
+완료된 이벤트가 있으면 콜백으로 V8에 전달한다. V8은 동기이므로 스택에 쌓인 이벤트를 하나씩 실행한다. 이것이 libuv의 일이다. (브라우저의 비동기와도 동일한 거 같다)
+
+#### 3.2.2 file
+
+드디어 파일 시스템을 해볼 차례다. 
+
+```greet.txt```라는 텍스트 파일을 하나 만들고, ```app.js``에서 파일을 읽어보자.
+
+<img width="750" alt="스크린샷 2025-05-20 오후 10 28 57" src="https://github.com/user-attachments/assets/9687eb94-03c3-40e1-9958-6255747a9a1f" />
+<br />
+
+여태까지 학습했던 것을 잠시 복습해보면, ```fs```은 C++로 구현된 모듈이다. 임베딩된 V8이 js 코드로 래핑해서 Node.js에서 모듈처럼 사용할 수 있다.
+
+```__dirname```은 Node.js가 모듈 시스템을 구현할 때, 즉시 실행 함수 패턴으로 전역 변수로 주입하는 변수다. 
+
+<img width="750" alt="스크린샷 2025-05-20 오후 10 36 59" src="https://github.com/user-attachments/assets/abd3eae6-66aa-49d1-b1fe-48b13f9522c1" />
+<br />
+
+이제 ```greet```을 찍어보면 ```greet.txt```의 바이너리 데이터가 Buffer 객체로 나오고 있다. (버퍼는 V8의 힙에 저장된다)
+
+아직 인코딩을 지정하지 않아서인데, ```utf-8```로 지정해주면 
+
+<img width="750" alt="스크린샷 2025-05-20 오후 10 45 20" src="https://github.com/user-attachments/assets/d9f3a55b-7b0a-4b04-8922-a865a9a66974" />
+<br />
+
+문자열로 잘 나온다. ```readFileSync```는 메서드명에서 알 수 있듯 동기로 작동한다. 그럼 비동기적으로 작동하는 친구를 알아보자. 
+
+<img width="750" alt="스크린샷 2025-05-20 오후 11 01 28" src="https://github.com/user-attachments/assets/346e59cb-f2f9-42d3-b947-927e2b1971b0" /><br />
+
+ ```readFile```는 비동기적으로 작동한다. 
+ 
+ 즉, 파일 읽기 요청을 OS에 전달하면 libuv가 이벤트 루프에서 비동기로 처리한다. 파일 읽기가 끝나면, 콜백이 호출되어 결과를 전달하는 식이다.
+
+#### 3.2.3 stream
+
+RS에서도 보았던 ```stream```이다. ```stream```은 데이터를 청크내서 순차적으로 처리하는 흐름이다. 버퍼가 찼다 -> 스트림 -> 다시 버퍼를 채운다 이렇게 반복한다.
+
+<img width="1000" alt="스크린샷 2025-05-21 오전 11 41 48" src="https://github.com/user-attachments/assets/2eccee49-a59d-494c-ae2a-684312984dd9" /><br />
+
+내부적으로 스트림을 보면, ```EventEmitter```를 상속하는 것을 알 수 있다. 그리고 스트림이 조금 독특한 점이 있는데, 바로 **추상 클래스**라는 것
+
+스트림은 직접 인스턴스화하지 않고, 상속받아 하위 클래스에서 read, write 등 구체적 동작을 구현한다. 
+
+이유인즉슨, 스트림은 어떤 동작이라기보다, 개념이기 때문이다. 그렇기 때문에 추상 클래스로 공통 동작만 정의하는 것이다. 
+
+그럼 간단한 예제를 살펴보자. 
+
+<img width="1000" alt="스크린샷 2025-05-21 오후 12 06 10" src="https://github.com/user-attachments/assets/465fdd48-4ffb-4ecc-933e-c73b3bf93fa7" /><br />
+
+장문의 텍스트를 ```greet.txt```에 담아 스트림했다. 
+
+<img width="750" alt="스크린샷 2025-05-21 오후 12 08 28" src="https://github.com/user-attachments/assets/faa3871e-3162-443e-9d2e-029e2ea7874a" /><br />
+
+텍스트의 ```length```는 대략 18,000개 정도 되고
+
+<img width="750" alt="스크린샷 2025-05-21 오후 12 10 14" src="https://github.com/user-attachments/assets/31274831-4994-40f4-9f0f-6579016ac28c" /><br />
+
+크기는 19KB다. 앞서 말했듯 버퍼가 차면 스트림을하고 다시 버퍼를 채우는 식으로 데이터를 흘러 보낸다. 그러면 스트림에서 버퍼의 용량을 제한해보자. 
 
 
+<img width="750" alt="스크린샷 2025-05-21 오후 12 14 47" src="https://github.com/user-attachments/assets/a0f83ade-79cd-4ca0-869f-bcdf501c9807" /><br />
+
+```highWaterMark```로 버퍼의 크기를 제한할 수 있다. 버퍼의 크기를 1KB로 제한해보자. (기본 버퍼의 크기는 64KB)
+
+<img width="750" alt="스크린샷 2025-05-21 오후 12 16 30" src="https://github.com/user-attachments/assets/5cc69a1e-f800-428e-8e19-c854784ad0d0" /><br />
+
+제한한 크기만큼 잘라서 오는 것을 확인할 수 있다. 
+
+
+#### 3.2.4 pipe
+
+이제 ```pipe```를 알아볼 차례다. pipe는 두 스트림, Readable과 Writable을 연결하는 메서드다.
+
+```pipe()```를 호출하면 Readable의 각 청크가 자동으로 Writable의 write()로 전달된다. 
+
+<img width="1000" alt="스크린샷 2025-05-21 오후 12 33 21" src="https://github.com/user-attachments/assets/016761c8-c188-40f8-8f2e-8267c898b039" /><br />
+
+```Readable.protoype.pipe``` 내부를 보면 더 정확하게 알 수 있는데, ```pipe```는 결국 ```EventEmitter```를 상속하고 있고, ```src``` 즉, 지금 Readable하고 있는 파일에서 ```dest``` 즉, 데이터를 보내고 싶은 쪽으로 write를 하면서 데이터를 전송한다. 
+
+
+<img width="1000" alt="스크린샷 2025-05-21 오후 12 40 46" src="https://github.com/user-attachments/assets/d1d3e27e-bbcb-4405-b3a0-5250c13f6f33" /><br />
+
+바꿔말해 위 과정을 
+
+<img width="1000" alt="스크린샷 2025-05-21 오후 12 41 23" src="https://github.com/user-attachments/assets/5f6ea55b-d7ef-40d8-9272-bc9d248d8ee3" /><br />
+
+이렇게 pipe로 대신하는 것이다. pipe는 또한 ```writable```를 반화하기 때문에 체이닝으로 연속 작업을 할 수 있다(함수형 프로그래밍의 pipe처럼)
+
+<img width="1000" alt="스크린샷 2025-05-21 오후 1 24 37" src="https://github.com/user-attachments/assets/3f00fd92-e0a9-4a9d-8ca9-fbd2ee4750cb" /><br />
+
+보통은 promise와 결합하여 사용한다. 
+
+## 4. 작성중
+
+
+ 
