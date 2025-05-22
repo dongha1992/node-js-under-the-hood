@@ -23,17 +23,19 @@
   - [갑분 call by reference와 call by value](#23-갑분-call-by-reference와-call-by-value)
   - [그땐 그랬었지](#24-그땐-그랬었지)
   - [require와 module.exports](#25-require와-moduleexports)
-- [이벤트](#3이벤트)
+- [이벤트 시스템](#3이벤트-시스템)
   - [Event Emitter](#31-event-emitter)
     - [Prototype](#311-prototype)
     - [call](#312-call)
   - [System Event](#32-system-event)
     - [Event Loop](#321-event-loop)
     - [process.nextTick()](#322-processnexttick)
-    - [libuv](#323-libuv)
-    - [file](#324-file)
-    - [stream](#325-stream)
-    - [pipe](#326-pipe)
+    - [promise는 어떻게 작동하는가](#323-promise는-어떻게-작동하는가)
+    - [그래서 async과 await은 어떻게 작동하느냐](#324-그래서-async과-await은-어떻게-작동하느냐)
+    - [libuv](#325-libuv)
+    - [file](#326-file)
+    - [stream](#327-stream)
+    - [pipe](#328-pipe)
 - [웹 서버](#4웹-서버)
 
 
@@ -229,6 +231,10 @@ module.exports = greet
 require, module, module.exports, __filename, __dirname 등등 이러한 변수들은 Node.js가 제공하는 내부 변수들이다. 
 결국 이러한 변수로 Node.js는 모듈 시스템을 만드는 것이다.
 
+CJS를 기반으로 하는 ```require```는 동기적으로 동작한다. require가 호출되면 모듈 파일을 디스크에서 읽고, 파싱하고 실행하여 Initial phase (이벤트 루프 시작 전)에 모듈을 모두 로딩한다.
+
+(반대로 import는 Promise 기반으로 비동기적으로 모듈을 로딩한다.)
+
 ### 2.3 갑분 call by reference와 call by value
 
 여기서 잠깐 js의 call by reference와 call by value를 봐야한다. 왜냐면 이 개념이 결국 Node.js의 모듈 시스템이기 떄문이다.
@@ -359,8 +365,9 @@ Node.js는 모든 모듈 파일을 내부적으로 Module Wrapper Function이란
 이모든 과정이 끝나면 ```require```로 가져온 모듈은 ```module.exports```로 반환된다.
 
 정리하자면, ```require```에 넘긴 ```'./greet'```를 **전체 파일 경로로 변환**하고 Node.js 내부에서 **모듈 객체와 exports 객채를 생성**한다. 그리고 해당 파일을 읽어와 **exports, require 등이 단긴 래퍼 함수로 감싸서 V8로 실행**하는 것이다. 
+
  
-## 3.이벤트
+## 3.이벤트 시스템
 
 이벤트란 무엇인가? 내게 이벤트는 브라우저 이벤트뿐이었지만, Node.js는 다르다. 
 
@@ -507,7 +514,9 @@ ES6 이후 Class가 나왔지만 여전히 js가 프로토타입 기반인 것�
 
 #### 3.2.1 Event Loop
 
-이벤트 루프는 Node.js에서 가장 중요한 개념이다. 이벤트 루프는 여러 단계를 거치는데 각 단계별로 자세히 알아보자.
+이벤트 루프는 Node.js에서 가장 중요한 개념이다. 이벤트 루프는 여러 단계를 거치는데 각 단계는 자신만의 queue를 가지고 있다. queue가 모두 실행되어야 다음 단계로 넘어간다.
+
+그럼 각 단계별로 자세히 알아보자.
   
     1. Initial Phase
 
@@ -593,13 +602,13 @@ Initial phase에 파일을 open, setImmediate을 등록한다. 그리고 Poll ph
 
 이제 check phase에 도달하면 setImmediate 콜백이 실행 되는데 파일 읽기 콜백은 아직 준비 안 되어서 다음 루프 때 poll phase에서 파일 읽기 콜백 준비하여 실행한다.
 
-<img width="750" alt="스크린샷 2025-05-22 오후 12 56 44" src="https://github.com/user-attachments/assets/ab5e66c9-13c8-41bb-8050-2f4e0b01f55e" />
+<img width="750" alt="스크린샷 2025-05-22 오후 12 56 44" src="https://github.com/user-attachments/assets/ab5e66c9-13c8-41bb-8050-2f4e0b01f55e" /><br />
 
 그리고 다음은 파일이 없을 경우다. 코드는 동일하고 파일만 존재하지 않는다.
 
 코드의 흐름은 Initial phase에서 파일 open을 시도하지만 실패한다. Poll phase에서 에러 콜백 즉시 준비하고 실행한다. 그리고나서 check phase에서 setImmediate 콜백 실행된다.
 
-<img width="750" alt="스크린샷 2025-05-22 오후 12 57 55" src="https://github.com/user-attachments/assets/858de6bf-ab6d-4da7-a06c-a986ea79bcb3" />
+<img width="750" alt="스크린샷 2025-05-22 오후 12 57 55" src="https://github.com/user-attachments/assets/858de6bf-ab6d-4da7-a06c-a986ea79bcb3" /><br />
 
 ```js
 fs.readFile(f, () => {
@@ -642,18 +651,110 @@ setImmediate는 바로 다음 check phase에서 실행되고, setTimeout(0)은 �
 
 이제 마지막 페이즈다. 이 단계에서는 소켓, 파일, 서버 등 리소스가 닫힐 때 발생하는 ```close``` 이벤트의 콜백이 실행된다.
 
+이렇게 이벤트루프의 모든 페이즈를 살펴봤다. 그림으로 보면 아래와 같다. 
+
+<img width="1000" alt="스크린샷 2025-05-22 오후 2 06 53" src="https://github.com/user-attachments/assets/fca77011-4824-4fdf-91ae-16e77bd77437" /><br />
+
+이제, 각 페이즈가 끝날때마다 등장하는 ```process.nextTick()```에 대해 알아보자.
 
 #### 3.2.2 process.nextTick()
 
 ```process.nextTick()```는 각 페이즈(타이머, poll, check 등) 사이마다 등록된 모든 nextTick 콜백을 즉시 실행한다. 이벤트루프의 일부라기보다 **마이크로태스크 큐**로 분리된다.
 
-<img width="750" alt="스크린샷 2025-05-22 오후 1 44 53" src="https://github.com/user-attachments/assets/68edfbcc-dbd3-4b8e-ab9d-4a4b30e132dc" />
+<img width="750" alt="스크린샷 2025-05-22 오후 1 44 53" src="https://github.com/user-attachments/assets/68edfbcc-dbd3-4b8e-ab9d-4a4b30e132dc" /><br />
 
-위 예시처럼 타이머 phase에서 콜백 실행 중 process.nextTick을 등록하면, 다음 phase인 poll phase로 넘어가기 전 nextTick 큐에 쌓인 모든 콜백을 실행한다.
+<img width="750" alt="스크린샷 2025-05-22 오후 2 09 37" src="https://github.com/user-attachments/assets/8c474881-e477-4bf7-b9d5-c5178ce5001d" /><br />
 
+위 예시처럼 타이머 phase에서 콜백 실행 중 process.nextTick을 등록하면, 다음 phase인 timer phase로 넘어가기 전 nextTick 큐에 쌓인 모든 콜백을 실행한다.
+즉, nextTick은 가장 빠른 비동기 콜백이며, 지금 당장 처리해야 하는 우선순위 작업에 적합하다. 
 
+#### 3.2.3 promise는 어떻게 작동하는가
 
-#### 3.2.3 libuv
+Promise는 콜백을 쉽게 사용하기 위한 문법적 설탕이란 말을 많이 들었을 것이다. 조금 어렵게 설명하자면, Promise는 콜백과 큐 등 기존 비동기 구조 위에 더 읽기 쉬운만들어진 추상화 계층이라고 할 수 있다.
+
+자세한 내용에 앞서 예제를 한 번 보고 가자.
+
+<img width="750" alt="스크린샷 2025-05-22 오후 2 26 38" src="https://github.com/user-attachments/assets/0c9223bd-895b-4aeb-8f03-14f9a8fb4f84" /><br />
+
+```promiseWork```는 4초 뒤에 리졸브 되는 setTimeout 콜백을 **즉시** 프로미스로 반환한다. 
+
+<img width="750" alt="스크린샷 2025-05-22 오후 2 27 19" src="https://github.com/user-attachments/assets/f809b437-2645-4e4c-80cf-2fdd4298c32b" /><br />
+
+반환된 프로미스는 리졸브되고, 
+
+<img width="750" alt="스크린샷 2025-05-22 오후 2 27 59" src="https://github.com/user-attachments/assets/6bca8522-7d1a-471f-8daf-6b7e5bbb7356" /><br />
+
+Initial phase 단계가 끝나면 setTimeout이 timer 단계에서 실행된다. 전체 코드는 아래와 같다.
+
+<img width="750" alt="스크린샷 2025-05-22 오후 2 28 38" src="https://github.com/user-attachments/assets/ed1a8845-7617-4f25-be91-71eba7691321" /><br />
+
+한번 흐름을 생각해보자. 
+
+Initial phase가 시작되면서 모든 console.log와 promiseWork를 실행, 실행하고, setTimeout을 콜백에 등록할 것이다. 
+
+```promiseWork```가 실행되면, Promise 객체가 생성되는데 이때 Promise의 콜백이 즉시 실행되면서 setTimeout을 등록하게 된다. setTimeout은 4초 뒤 resolve를 호출할 것이다. 
+
+Initial phase가 끝나면 Timer phase가 시작되고 등록된 setTimeout의 콜백이 실행된다. 
+
+그리고 setTimeout가 4초 뒤 resolve를 호출하면 이제서야 ```promised.then```에서 콜백으로 받은 로그가 실행될 것이다. 그럼 실행결과를 보자
+
+<img width="750" alt="스크린샷 2025-05-22 오후 2 59 00" src="https://github.com/user-attachments/assets/bc97f7b6-a561-481b-8d77-8089c0d1b288" /><br />
+
+```---END Initial phase---```가 끝나고 이벤트루프에 진입한다. 
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 06 47" src="https://github.com/user-attachments/assets/d3aa5283-8bc1-42a8-900e-ef8c66f10641" /><br />
+
+콜백에 등록된 setTimeout가 실행되었다.
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 07 56" src="https://github.com/user-attachments/assets/654a9e4b-4122-404e-97ad-56903e9c5f05" /><br />
+
+4초가 지나고 resolve가 되면서 then으로 물린 콜백이 실행된다. (어우 헷갈려)
+
+여기서 흥미로운 점은 Promise가 resolve나 reject 되었을 때, then이나 catch에 등록된 콜백이 **마이크로태스크 큐**에서 실행된다는 것이다. 
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 20 35" src="https://github.com/user-attachments/assets/320186cb-2673-4f6a-805d-c8b3ed4c25aa" /><br />
+
+즉, ```nextTick```으로 콜백을 받아 실행하는 것과 동일하다.
+
+다시 정리하면 현재 동기 코드로 작동하는 코드들 혹은 phase가 끝난 뒤, 다음 phase로 넘어가기 전에 Promise의 then이나 catch 콜백이 반드시 먼저 실행되는 것이다!!!
+
+#### 3.2.4 그래서 async과 await은 어떻게 작동하느냐
+
+async 함수 내에서 await를 만나면 해당 Promise가 resolve될 때까지 함수 실행을 동기적으로 멈춘 것 같아 보이지만, 실제로는 await **이후** 코드는 Promise의 then처럼 콜백으로 분리되어 실행된다.
+
+아주 흥미로운 사실을 발견했다. **await 이후 코드는 Promise의 then처럼 콜백으로 분리된다**고 했다. 확인해보자 
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 35 26" src="https://github.com/user-attachments/assets/6d60a739-4388-42d5-b5c9-eb24408fd1df" /><br />
+
+```then`` 콜백으로 받던 것을 ```async```,```await```으로 수정했다. 그리고 실행해보면 
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 39 16" src="https://github.com/user-attachments/assets/8f81babc-1842-4d24-b6be-07bcfcab13d8" /><br />
+
+실제로 await **이후** 코드는 then의 콜백처럼 resolve이후 같이 실행된다!! (진짜 신기함)
+
+여기서 await, async 형제가 비동기 코드를 동기처럼 보이게 해준다는 이유가 있다.
+
+await를 만나면 Promise가 resolve될 때까지 함수 실행이 일시 중단되지만 이벤트 루프는 멈추지 않고 다른 작업을 계속 처리한다. 그래서 비동기이지만 동기처럼 보이는 것!
+
+Promise가 resolve되면 **마이크로태스크 큐**, 즉 nextTick에서 실행된다. nextTick은 각 페이즈가 끝나면 실행된다. 혹시 이 과정이 헷갈리다면 간소하게 마지막 예제를 보면 된다.
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 54 42" src="https://github.com/user-attachments/assets/2b0fbf05-3ddc-47b5-9bee-9b29886bde08" /><br />
+
+```promiseWork```에서 setTimeout을 제거했다. 
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 56 50" src="https://github.com/user-attachments/assets/4cc767de-47a3-479f-8045-a0c7a336e339" /><br />
+
+async 함수인 ```run```
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 55 51" src="https://github.com/user-attachments/assets/a5275f6e-e12e-4c54-9aba-fa020fc9f8db" /><br />
+
+그리고 0초 뒤에 실행되는 setTimeout이 있고 ```run```이 실행된다. 실행 순서를 확인해보면
+
+<img width="750" alt="스크린샷 2025-05-22 오후 3 58 09" src="https://github.com/user-attachments/assets/0ad87a7c-9cda-466c-a8d5-5a7140b41276" /><br />
+
+Initial phase -> nextTick() -> Timer phase 이기 때문이다!!
+
+#### 3.2.5 libuv 
 
 libuv은 이벤트 루프와 더불어 Node.js의 핵심이다. 
 
@@ -665,7 +766,7 @@ libuv는 Node.js에 내장된 C 라이브러리로 Node.js에서 비동기를 �
 
 완료된 이벤트가 있으면 콜백으로 V8에 전달한다. V8은 동기이므로 스택에 쌓인 이벤트를 하나씩 실행한다. 이것이 libuv의 일이다. (브라우저의 비동기와도 동일한 거 같다)
 
-#### 3.2.4 file
+#### 3.2.6 file
 
 드디어 파일 시스템을 해볼 차례다. 
 
@@ -696,7 +797,7 @@ libuv는 Node.js에 내장된 C 라이브러리로 Node.js에서 비동기를 �
  
  즉, 파일 읽기 요청을 OS에 전달하면 libuv가 이벤트 루프에서 비동기로 처리한다. 파일 읽기가 끝나면, 콜백이 호출되어 결과를 전달하는 식이다.
 
-#### 3.2.5 stream
+#### 3.2.7 stream
 
 RS에서도 보았던 ```stream```이다. ```stream```은 데이터를 청크내서 순차적으로 처리하는 흐름이다. 버퍼가 찼다 -> 스트림 -> 다시 버퍼를 채운다 이렇게 반복한다.
 
@@ -722,7 +823,6 @@ RS에서도 보았던 ```stream```이다. ```stream```은 데이터를 청크내
 
 크기는 19KB다. 앞서 말했듯 버퍼가 차면 스트림을하고 다시 버퍼를 채우는 식으로 데이터를 흘러 보낸다. 그러면 스트림에서 버퍼의 용량을 제한해보자. 
 
-
 <img width="750" alt="스크린샷 2025-05-21 오후 12 14 47" src="https://github.com/user-attachments/assets/a0f83ade-79cd-4ca0-869f-bcdf501c9807" /><br />
 
 ```highWaterMark```로 버퍼의 크기를 제한할 수 있다. 버퍼의 크기를 1KB로 제한해보자. (기본 버퍼의 크기는 64KB)
@@ -732,7 +832,7 @@ RS에서도 보았던 ```stream```이다. ```stream```은 데이터를 청크내
 제한한 크기만큼 잘라서 오는 것을 확인할 수 있다. 
 
 
-#### 3.2.6 pipe
+#### 3.2.8 pipe
 
 이제 ```pipe```를 알아볼 차례다. pipe는 두 스트림, Readable과 Writable을 연결하는 메서드다.
 
