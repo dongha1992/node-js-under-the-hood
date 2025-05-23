@@ -1,4 +1,4 @@
-# [Learn and Understand NodeJS](https://www.udemy.com/course/understand-nodejs/?utm_source=adwords&utm_medium=udemyads&utm_campaign=Search_DSA_Beta_Prof_la.EN_cc.ROW-English&campaigntype=Search&portfolio=ROW-English&language=EN&product=Course&test=&audience=DSA&topic=&priority=Beta&utm_content=deal4584&utm_term=_._ag_162511579404_._ad_696197165421_._kw__._de_c_._dm__._pl__._ti_dsa-1677053911088_._li_9196883_._pd__._&matchtype=&gad_source=1&gad_campaignid=21168154305&gbraid=0AAAAADROdO0_sczDNpw8g4_LjE_XlQqVy&gclid=CjwKCAjwravBBhBjEiwAIr30VHtpqc6vF8B8LIIGH7dNjehWgG-ZhCcGS-IV-ARdvPVbzQFNNb_tvRoCMoYQAvD_BwE)
+# [NodeJS Internals and Architecture](https://www.udemy.com/course/understand-nodejs/?utm_source=adwords&utm_medium=udemyads&utm_campaign=Search_DSA_Beta_Prof_la.EN_cc.ROW-English&campaigntype=Search&portfolio=ROW-English&language=EN&product=Course&test=&audience=DSA&topic=&priority=Beta&utm_content=deal4584&utm_term=_._ag_162511579404_._ad_696197165421_._kw__._de_c_._dm__._pl__._ti_dsa-1677053911088_._li_9196883_._pd__._&matchtype=&gad_source=1&gad_campaignid=21168154305&gbraid=0AAAAADROdO0_sczDNpw8g4_LjE_XlQqVy&gclid=CjwKCAjwravBBhBjEiwAIr30VHtpqc6vF8B8LIIGH7dNjehWgG-ZhCcGS-IV-ARdvPVbzQFNNb_tvRoCMoYQAvD_BwE](https://www.udemy.com/course/nodejs-internals-and-architecture/?couponCode=ND-MAY2025-L))
 
 미루고 미루던 노드 공부. 자바스크립트에 대한 이해를 확실히 하기 위해선 노드JS도 잘 알아야 한다는 생각에 학습을 하게 되었다. 
 
@@ -726,7 +726,7 @@ async 함수 내에서 await를 만나면 해당 Promise가 resolve될 때까지
 
 <img width="750" alt="스크린샷 2025-05-22 오후 3 35 26" src="https://github.com/user-attachments/assets/6d60a739-4388-42d5-b5c9-eb24408fd1df" /><br />
 
-```then`` 콜백으로 받던 것을 ```async```,```await```으로 수정했다. 그리고 실행해보면 
+```then``` 콜백으로 받던 것을 ```async```,```await```으로 수정했다. 그리고 실행해보면 
 
 <img width="750" alt="스크린샷 2025-05-22 오후 3 39 16" src="https://github.com/user-attachments/assets/8f81babc-1842-4d24-b6be-07bcfcab13d8" /><br />
 
@@ -760,11 +760,13 @@ libuv은 이벤트 루프와 더불어 Node.js의 핵심이다.
 
 <img width="1000" alt="스크린샷 2025-05-20 오후 8 55 33" src="https://github.com/user-attachments/assets/62b6921b-38cd-47d7-8e86-75150c3cf238" /><br />
 
-libuv는 Node.js에 내장된 C 라이브러리로 Node.js에서 비동기를 담당한다.
+libuv는 Node.js에 내장된 C 라이브러리로 Node.js에서 이벤트 루프를 구현하여 비동기를 담당한다.
 
 위 그림에서 libuv는 OS에 요청을 보내고, 이벤트가 완료되면 Queue에 등록한다. 이때, libuv는 이벤트 루프를 통해 완료된 이벤트가 있는지 확인한다.
 
 완료된 이벤트가 있으면 콜백으로 V8에 전달한다. V8은 동기이므로 스택에 쌓인 이벤트를 하나씩 실행한다. 이것이 libuv의 일이다. (브라우저의 비동기와도 동일한 거 같다)
+
+앞서 말했든 Node.js는 OS 플랫폼에 구애받지 않고 동작하는 
 
 #### 3.2.6 file
 
