@@ -37,6 +37,8 @@
     - [stream](#327-stream)
     - [pipe](#328-pipe)
 - [네트워크](#4네트워크)
+  - [HTTP](#41-http)
+  - [DNS](#42-DNS)
 
 
 ## 1.V8 엔진
@@ -795,7 +797,12 @@ libuv는 Node.js에 내장된 C 라이브러리로 Node.js에서 이벤트 루�
 
  ```readFile```는 비동기적으로 작동한다. 
  
- 즉, 파일 읽기 요청을 OS에 전달하면 libuv가 이벤트 루프에서 비동기로 처리한다. 파일 읽기가 끝나면, 콜백이 호출되어 결과를 전달하는 식이다.
+즉, 파일 읽기 요청을 OS에 전달하면 libuv가 이벤트 루프에서 비동기로 처리한다. 파일 읽기가 끝나면, 콜백이 호출되어 결과를 전달하는 식이다.
+
+파일 I/O는 외부 하드웨어와의 통신이기 때문에 네트워크 I/O보다 느리고 비용이 크다. 
+
+OS는 기본적으로 파일 I/O에 대해 블로킹 방식으로 처리하기 때문에 NodeJs에선 libuv의 스레드풀을 활용하여 워커 스레드에서 파일 I/O를 실행한다. 
+ 
 
 #### 3.2.7 stream
 
@@ -856,27 +863,123 @@ RS에서도 보았던 ```stream```이다. ```stream```은 데이터를 청크내
 보통은 promise와 결합하여 사용한다. 
 
 
-## 4. 네트워크
+## 4.네트워크
 
 렛츠고 네트워크! NodeJs의 네트워크에 들어가기 전에 네트워크 관련 간단한 개념을 짚어가보자.
 
-<img width="500" alt="스크린샷 2025-06-01 오후 11 09 27" src="https://github.com/user-attachments/assets/e42d7330-ce89-41ad-9e45-0d922e9d6d37" />
+<img width="750" alt="스크린샷 2025-06-01 오후 11 09 27" src="https://github.com/user-attachments/assets/e42d7330-ce89-41ad-9e45-0d922e9d6d37" /><br />
 
 먼저, 클라이언트에서 서버에 연결을 시도하면 소켓 객체(노트북 앞에 빨간점)가 생성된다. 그럼 서버는 리스닝 소켓(서버쪽 초록점)을 열고 클라이언트의 연결 요청을 accept하면 새로운 연결 소켓(서버쪽 흰점)이 생성되어 각 연결을 고유하게 식별한다.
 
 이로써 클라이언트-서버가 연결된 것이다. 연결된 소켓을 통해서만 읽기/쓰기가 가능하며, 리스닝 소켓에서는 데이터 입출력이 불가능하다.
 
-### 4.1 TCP
+<img width="750" alt="스크린샷 2025-06-02 오전 11 22 03" src="https://github.com/user-attachments/assets/0cde407f-8cde-4e08-9331-9a33827eda8d" /><br />
 
-그 유명한 TCP의 3-way handshake을 알아볼 차례다. 위 그림에서 봤듯 네트워크의 요청과 응답 구조가 HTTP다.
+클라-서버에서 데이터를 주고 받게 되면, 먼저 epoll로 해당 소켓이 읽기/쓰기가 가능한지 확인 후 실제 read/write 시스템 콜을 진행한다.
 
-하지만 TCP는 쌍방향 통신이 가능하다. 어떻게 그것이 가능한지 알아보자!
+여기서 **epoll**은 리눅스에서 사용하는 비동기 I/O에 쓰이는 개념이다. 간단하게 말하면 소켓의 변화를 감지하여 알리는 역할을 수행한다.
 
-<img width="1031" alt="스크린샷 2025-06-01 오후 11 23 24" src="https://github.com/user-attachments/assets/972fd391-0141-4ad4-996f-33a76b5b3dab" />
+아무튼, NodeJs는 내부적으로 epoll을 통해 소켓의 상태를 감지하고, 데이터가 도착하면 on('data') 이벤트를 자동으로 발생시켜 콜백을 실행한다.
 
+그럼 이제 클라에서 보낸 'hello'란 데이터는 커널에서 복사되어 Node.js로 전달된다.
 
+그럼 예제와 함께 데이터 송수신 과정을 살펴보자.
 
+<img width="750" alt="스크린샷 2025-06-02 오전 11 40 04" src="https://github.com/user-attachments/assets/a1bd5065-bc18-4b3e-a03c-ad64f2cbfc21" /><br />
 
+net을 사용하여 connect, write, close 흐름을 구축했다.
+
+<img width="750" alt="스크린샷 2025-06-02 오전 11 49 18" src="https://github.com/user-attachments/assets/2ef0f833-c022-4a1f-a639-2ccd7a93ef44" /><br />
+
+<img width="750" alt="스크린샷 2025-06-02 오전 11 49 53" src="https://github.com/user-attachments/assets/07164413-e1f9-4759-99b5-b620e28d5517" /><br />
+
+여기서 ```93.184.215.14```는 https://www.example.com 의 IP다. 93.184.215.14에 80포트로 연결을 시도하고 ```client.connect```로 connection이 생성되면 epoll은 I/O가 준비될 때까지 대기한다. 
+
+<img width="652" alt="스크린샷 2025-06-02 오전 11 55 27" src="https://github.com/user-attachments/assets/b3f7fac7-68e3-4204-8d7c-14c20aca418c" /><br />
+
+그리고 ```client.on("data", ...)``` 에서 NodeJs가 콜백을 실행하게 되는 것이다. 
+
+자, 이제 서버 케넥션를 추가하면
+
+<img width="750" alt="스크린샷 2025-06-02 오후 12 23 54" src="https://github.com/user-attachments/assets/ed8a2add-6f7e-4621-a3a9-7a661acf8295" /><br />
+
+첫 그림 예제에서 봤듯이, ```listen(8080)```로 리스닝 소켓을 생성하고, ```connection```으로 새로운 서버쪽 연결 소켓을 만든다. 
+
+### 4.1 HTTP
+
+HTTP는 정말 신기한 거 같다. 현대 사회로 이끈 게 HTTP 덕분이 아닐까 생각이 들정도로.. 
+
+아무튼, HTTP는 원래 텍스트 기반으로 설계되어 사람이 직접 읽고 쓰기 쉬웠지만, 이후 HTTP/2, HTTP/3에서는 성능을 위해 바이너리 포맷으로 변화했다.
+
+HTTP/2, HTTP/3는 데이터를 바이너리로 변환해 전송하며, 응답은 압축되어 전송되기도 한다.
+
+HTTP의 본질은 결국 요청-응답 구조다. TCP를 생각해보자. TCP는 그냥 양방향 바이트 스트림이다. 순서도 없고 왔다갔다할 뿐이다.
+
+그런데, HTTP는 요청이 있을 때만 응답을 준다. 
+
+요청의 시작과 끝은 어디고 응답의 시작과 끝은 어디인가! 이러한 것들을 정교하게 컨트롤 하는 HTTP가 신비로울뿐..
+
+<img width="1000" alt="스크린샷 2025-06-02 오후 2 52 13" src="https://github.com/user-attachments/assets/cf0ec5af-2974-4385-b4d3-dc18817a079c" /><br />
+
+기본적으로 HTTP 1.1에서 한 커넥션에서 한 번에 하나의 요청만 처리된다. 다음 요청은 응답이 끝난 뒤에 보낼 수 있다.
+
+크롬은 도메인당 여러 커넥션(기본 6개)을 열어 동시성을 확보하기도 한다.
+
+그럼 NodeJs에선 HTTP를 어떻게 다룰까
+
+<img width="500" alt="스크린샷 2025-06-02 오후 2 59 46" src="https://github.com/user-attachments/assets/b7cc0b9f-d735-4a2c-ba4d-fda67d3ff83c" /><br />
+
+NodeJs에선 에이전트로 커넥션 풀을 관리한다. 커넥션 풀이 가득 차면 요청이 큐에 쌓여 대기하게 된다. 
+
+### 4.2 DNS
+
+네트워크에서 빠질 수 없는 DNS 차례다. DNS는 간단하게 말해 도메인을 IP로 매핑해주는 역할을 한다. 
+
+DNS는 단일 거대한 데이터베이스가 아니라, 루트 서버 → TLD 서버(.com) → 권한 네임서버로 이어지는 계층적인 구조이다. 
+
+예를들어 www.google.com 접속 시 DNS 동작 과정을 나열하면, 
+
+<img width="1000" alt="스크린샷 2025-06-03 오후 4 50 31" src="https://github.com/user-attachments/assets/048f435d-f7f6-452f-ac79-da784598fdfb" /><br />
+
+1. 사용자가 브라우저에 도메인 입력하면 DNS 리졸버에게 요청한다.
+
+2. 캐시가 있다면 해당 도메인의 IP를 반환하고, 캐시가 없다면 루트 서버에 요청하게 된다.
+
+<img width="1000" alt="스크린샷 2025-06-03 오후 4 53 56" src="https://github.com/user-attachments/assets/bd7c93fc-5cde-4033-a212-ad7688dfb798" /><br />
+
+3. 루트 서버는 DNS 계층에서 최상위 계층으로, TLD(Top-Level Domain) 서버의 주소를 제공한다. 즉, 루트 서버는 ".com"과 같은 TLD 서버의 IP를 알려주는 역할을 하는 것이다.
+
+4. 루트 서버는 ".com" TLD 서버의 IP 목록을 반환하고, DNS 리졸버가 "google.com"의 권한 있는 네임서버 주소(AWS와 같은)를 요청한다.
+
+<img width="1000" alt="스크린샷 2025-06-03 오후 4 57 19" src="https://github.com/user-attachments/assets/e18cfb6d-207a-49a4-9fd5-89d1ea3db724" /><br />
+
+5. 권한 네임서버가 IP 주소를 반환하면 리졸버가 캐시에 저장 후 사용자에게 전달한다. 
+
+자, 그렇다면 Node에서는 어떻게 DNS를 처리할까?
+
+<img width="750" alt="스크린샷 2025-06-03 오후 5 14 25" src="https://github.com/user-attachments/assets/549c3eee-4460-4cc2-8010-36f5a7a0bba5" /><br />
+
+NodeJs는 내부적으로 libuv의 스레드풀을 사용해 DNS 질의를 처리한다.
+
+그럼 여기서 궁금한 점이 생기는데, DNS는 분명 UDP(53번 포트) 기반의 네트워크 I/O인데, 왜 NodeJs에서는 스레드풀을 사용할까?
+
+사실 NodeJs에서 DNS 처리는 상당히 복잡한 작업이다.
+
+파일 I/O에서 hosts 파일 조회도 해봐야 하고, 네트워크 I/O에서 실제 DNS 서버와의 UDP 통신도 해야한다. (OS 레벨의 DNS 캐시 조회도 있다)
+
+그래서 NodeJs는 DNS 조회를 위해 ```getaddrinfo()```라는 시스템 콜을 사용하는데, ```getaddrinfo()```는 네트워크 DNS 전에 로컬 hosts 파일을 먼저 확인한다.
+
+```js
+const req = http.request('https://example.com', { method: "GET" });
+```
+
+가령 이러한 요청을 발생했다고 하자, 그렇다면 NodeJs는 아래와 같이 처리한다.
+
+1. 먼저 메인 스레드에선 HTTP 요청 시작한다.
+2. 그리고 libuv 스레드풀에서 getaddrinfo() 호출하여 hosts 파일 조회 및 DNS 서버 질의를 수행한다.
+3. 마지막으로 메인 스레드에서 DNS 결과 받아서 TCP 연결 시작한다.
+
+### 4.3 TCP
 
 
 
